@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "logicAppName": {
+      "value": "logicapp-adf-trigger"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "sku": {
+      "value": "Consumption"
+    },
+    "dataFactorySubscriptionId": {
+      "value": "YOUR_SUBSCRIPTION_ID"
+    },
+    "dataFactoryResourceGroup": {
+      "value": "YOUR_RESOURCE_GROUP"
+    },
+    "dataFactoryName": {
+      "value": "YOUR_DATA_FACTORY_NAME"
+    },
+    "defaultPipelineName": {
+      "value": "YOUR_PIPELINE_NAME"
+    },
+    "tags": {
+      "value": {
+        "Environment": "Production",
+        "Purpose": "ADF-Integration",
+        "ManagedBy": "Bicep"
+      }
+    }
+  }
+}

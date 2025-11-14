@@ -1,0 +1,233 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "subscriptionId": {
+      "type": "string",
+      "defaultValue": "YOUR_SUBSCRIPTION_ID",
+      "metadata": {
+        "description": "Azure subscription ID where ADF is located"
+      }
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "defaultValue": "YOUR_RESOURCE_GROUP",
+      "metadata": {
+        "description": "Resource group name where ADF is located"
+      }
+    },
+    "dataFactoryName": {
+      "type": "string",
+      "defaultValue": "YOUR_DATA_FACTORY_NAME",
+      "metadata": {
+        "description": "Name of the Azure Data Factory"
+      }
+    },
+    "pipelineName": {
+      "type": "string",
+      "defaultValue": "YOUR_PIPELINE_NAME",
+      "metadata": {
+        "description": "Name of the ADF pipeline to trigger"
+      }
+    }
+  },
+  "triggers": {
+    "manual": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "pipelineParameters": {
+              "type": "object",
+              "description": "Optional parameters to pass to the ADF pipeline"
+            }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "Create_ADF_Pipeline_Run": {
+      "type": "Http",
+      "inputs": {
+        "method": "POST",
+        "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/resourceGroups/@{parameters('resourceGroupName')}/providers/Microsoft.DataFactory/factories/@{parameters('dataFactoryName')}/pipelines/@{parameters('pipelineName')}/createRun?api-version=2018-06-01",
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://management.azure.com/"
+        },
+        "body": "@triggerBody()?['pipelineParameters']"
+      },
+      "runAfter": {}
+    },
+    "Parse_Pipeline_Run_Response": {
+      "type": "ParseJson",
+      "inputs": {
+        "content": "@body('Create_ADF_Pipeline_Run')",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "Create_ADF_Pipeline_Run": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Initialize_Run_ID": {
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "PipelineRunId",
+            "type": "string",
+            "value": "@{body('Parse_Pipeline_Run_Response')?['runId']}"
+          }
+        ]
+      },
+      "runAfter": {
+        "Parse_Pipeline_Run_Response": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Wait_Before_Checking_Status": {
+      "type": "Wait",
+      "inputs": {
+        "interval": {
+          "count": 30,
+          "unit": "Second"
+        }
+      },
+      "runAfter": {
+        "Initialize_Run_ID": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Initialize_Pipeline_Status_Variable": {
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "PipelineStatus",
+            "type": "string",
+            "value": "InProgress"
+          }
+        ]
+      },
+      "runAfter": {
+        "Wait_Before_Checking_Status": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Until_Pipeline_Completes": {
+      "type": "Until",
+      "expression": "@or(equals(variables('PipelineStatus'), 'Succeeded'), equals(variables('PipelineStatus'), 'Failed'), equals(variables('PipelineStatus'), 'Cancelled'))",
+      "limit": {
+        "count": 60,
+        "timeout": "PT1H"
+      },
+      "actions": {
+        "Get_Pipeline_Run_Status": {
+          "type": "Http",
+          "inputs": {
+            "method": "GET",
+            "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/resourceGroups/@{parameters('resourceGroupName')}/providers/Microsoft.DataFactory/factories/@{parameters('dataFactoryName')}/pipelineruns/@{variables('PipelineRunId')}?api-version=2018-06-01",
+            "authentication": {
+              "type": "ManagedServiceIdentity",
+              "audience": "https://management.azure.com/"
+            }
+          }
+        },
+        "Parse_Status_Response": {
+          "type": "ParseJson",
+          "inputs": {
+            "content": "@body('Get_Pipeline_Run_Status')",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "runStart": {
+                  "type": "string"
+                },
+                "runEnd": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "runAfter": {
+            "Get_Pipeline_Run_Status": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Set_Pipeline_Status": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "PipelineStatus",
+            "value": "@{body('Parse_Status_Response')?['status']}"
+          },
+          "runAfter": {
+            "Parse_Status_Response": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Wait_30_Seconds": {
+          "type": "Wait",
+          "inputs": {
+            "interval": {
+              "count": 30,
+              "unit": "Second"
+            }
+          },
+          "runAfter": {
+            "Set_Pipeline_Status": [
+              "Succeeded"
+            ]
+          }
+        }
+      },
+      "runAfter": {
+        "Initialize_Pipeline_Status_Variable": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Response": {
+      "type": "Response",
+      "kind": "Http",
+      "inputs": {
+        "statusCode": 200,
+        "body": {
+          "message": "ADF Pipeline execution completed",
+          "runId": "@variables('PipelineRunId')",
+          "status": "@variables('PipelineStatus')",
+          "dataFactory": "@parameters('dataFactoryName')",
+          "pipeline": "@parameters('pipelineName')"
+        }
+      },
+      "runAfter": {
+        "Until_Pipeline_Completes": [
+          "Succeeded"
+        ]
+      }
+    }
+  },
+  "outputs": {}
+}

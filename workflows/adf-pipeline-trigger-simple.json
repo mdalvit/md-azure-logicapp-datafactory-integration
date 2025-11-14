@@ -1,0 +1,105 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "subscriptionId": {
+      "type": "string",
+      "defaultValue": "YOUR_SUBSCRIPTION_ID",
+      "metadata": {
+        "description": "Azure subscription ID where ADF is located"
+      }
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "defaultValue": "YOUR_RESOURCE_GROUP",
+      "metadata": {
+        "description": "Resource group name where ADF is located"
+      }
+    },
+    "dataFactoryName": {
+      "type": "string",
+      "defaultValue": "YOUR_DATA_FACTORY_NAME",
+      "metadata": {
+        "description": "Name of the Azure Data Factory"
+      }
+    },
+    "pipelineName": {
+      "type": "string",
+      "defaultValue": "YOUR_PIPELINE_NAME",
+      "metadata": {
+        "description": "Name of the ADF pipeline to trigger"
+      }
+    }
+  },
+  "triggers": {
+    "manual": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "pipelineParameters": {
+              "type": "object",
+              "description": "Optional parameters to pass to the ADF pipeline"
+            }
+          }
+        }
+      }
+    }
+  },
+  "actions": {
+    "Create_ADF_Pipeline_Run": {
+      "type": "Http",
+      "inputs": {
+        "method": "POST",
+        "uri": "https://management.azure.com/subscriptions/@{parameters('subscriptionId')}/resourceGroups/@{parameters('resourceGroupName')}/providers/Microsoft.DataFactory/factories/@{parameters('dataFactoryName')}/pipelines/@{parameters('pipelineName')}/createRun?api-version=2018-06-01",
+        "authentication": {
+          "type": "ManagedServiceIdentity",
+          "audience": "https://management.azure.com/"
+        },
+        "body": "@triggerBody()?['pipelineParameters']"
+      },
+      "runAfter": {}
+    },
+    "Parse_Response": {
+      "type": "ParseJson",
+      "inputs": {
+        "content": "@body('Create_ADF_Pipeline_Run')",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "Create_ADF_Pipeline_Run": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Response": {
+      "type": "Response",
+      "kind": "Http",
+      "inputs": {
+        "statusCode": 202,
+        "body": {
+          "message": "ADF Pipeline triggered successfully",
+          "runId": "@body('Parse_Response')?['runId']",
+          "dataFactory": "@parameters('dataFactoryName')",
+          "pipeline": "@parameters('pipelineName')",
+          "note": "This is a fire-and-forget trigger. Check ADF portal for pipeline status."
+        }
+      },
+      "runAfter": {
+        "Parse_Response": [
+          "Succeeded"
+        ]
+      }
+    }
+  },
+  "outputs": {}
+}

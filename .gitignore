@@ -1,0 +1,30 @@
+# Azure deployment outputs
+logic-app-callback-url.txt
+deployment-output.json
+*.log
+
+# Environment files
+.env
+.env.local
+*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PowerShell
+*.ps1xml
+
+# Secrets (never commit)
+*secret*
+*password*
+*key*
+*token*
+connection-strings.txt
