@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A production-ready implementation for triggering Azure Data Factory pipelines from Azure Logic Apps using **HTTP actions with Managed Identity authentication**.
+A test lab-ready implementation for triggering Azure Data Factory pipelines from Azure Logic Apps using **HTTP actions with Managed Identity authentication**.
 
 ## 🎯 Purpose
 
@@ -12,7 +12,7 @@ This repository provides a workaround for the [API Connection issues in Logic Ap
 
 - **Microsoft Recommended**: Official documentation explicitly recommends Managed Identity for optimal security
 - **Bypasses API Connection Issues**: No dependency on managed connectors
-- **Production Tested**: Successfully running in production environments
+- **Test Lab Validated**: Successfully tested in test lab environments
 - **Better Performance**: Built-in connectors run in-process
 - **More Secure**: No credential management required
 - **Full Control**: Direct REST API access to Azure Data Factory
